@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/gogf/gf-cli/library/mlog"
-	"github.com/gogf/gf-cli/library/proxy"
 	"github.com/gogf/gf/encoding/gbase64"
 	"github.com/gogf/gf/frame/g"
 	"github.com/gogf/gf/os/gcmd"
@@ -73,7 +72,7 @@ OPTION
     -s, --system     output binary system, multiple os separated with ','
     -o, --output     output binary path, used when building single binary file
     -p, --path       output binary directory path, default is './bin'
-	-e, --extra      extra custom "go build" options
+    -e, --extra      extra custom "go build" options
     -m, --mod        like "-mod" option of "go build", use "-m none" to disable go module
     --swagger        auto parse and pack swagger into boot/data-swagger.go before building. 
     --pack           auto pack config,public,template folder into boot/data-packed.go before building.
@@ -141,32 +140,38 @@ func Run() {
 	}
 	file := parser.GetArg(2)
 	if len(file) < 1 {
-		mlog.Fatal("build file path cannot be empty")
+		// Check and use the main.go file.
+		if gfile.Exists("main.go") {
+			file = "main.go"
+		} else {
+			mlog.Fatal("build file path cannot be empty")
+		}
 	}
 	path := getOption(parser, "path", "./bin")
 	name := getOption(parser, "name", gfile.Name(file))
 	if len(name) < 1 || name == "*" {
 		mlog.Fatal("name cannot be empty")
 	}
-	mod := getOption(parser, "mod")
-	extra := getOption(parser, "extra")
-	if mod != "" {
-		if mod == "none" {
-			proxy.SetGoModuleEnabled(false)
+	var (
+		mod   = getOption(parser, "mod")
+		extra = getOption(parser, "extra")
+	)
+	if mod != "" && mod != "none" {
+		mlog.Debugf(`mod is %s`, mod)
+		if extra == "" {
+			extra = fmt.Sprintf(`-mod=%s`, mod)
 		} else {
-			if extra == "" {
-				extra = fmt.Sprintf(`-mod=%s`, mod)
-			} else {
-				extra = fmt.Sprintf(`-mod=%s %s`, mod, extra)
-			}
+			extra = fmt.Sprintf(`-mod=%s %s`, mod, extra)
 		}
 	}
-	version := getOption(parser, "version")
-	outputPath := getOption(parser, "output")
-	archOption := getOption(parser, "arch")
-	systemOption := getOption(parser, "system")
-	arches := strings.Split(archOption, ",")
-	systems := strings.Split(systemOption, ",")
+	var (
+		version      = getOption(parser, "version")
+		outputPath   = getOption(parser, "output")
+		archOption   = getOption(parser, "arch")
+		systemOption = getOption(parser, "system")
+		arches       = strings.Split(archOption, ",")
+		systems      = strings.Split(systemOption, ",")
+	)
 	if len(version) > 0 {
 		path += "/" + version
 	}
@@ -211,10 +216,12 @@ func Run() {
 	// start building
 	mlog.Print("start building...")
 	genv.Set("CGO_ENABLED", "0")
-	cmd := ""
-	ext := ""
-	reg := regexp.MustCompile(`\s+`)
-	lines := strings.Split(strings.TrimSpace(platforms), "\n")
+	var (
+		cmd   = ""
+		ext   = ""
+		reg   = regexp.MustCompile(`\s+`)
+		lines = strings.Split(strings.TrimSpace(platforms), "\n")
+	)
 	for _, line := range lines {
 		cmd = ""
 		ext = ""
